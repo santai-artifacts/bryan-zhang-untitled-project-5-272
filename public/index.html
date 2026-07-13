@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cookie Clicker</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #1a1108;
+    color: #f5e6c8;
+    font-family: monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    padding: 24px;
+  }
+
+  h1 { font-size: 1.4rem; letter-spacing: 0.1em; opacity: 0.7; }
+
+  #total {
+    font-size: clamp(2rem, 8vw, 4rem);
+    font-weight: bold;
+    color: #f5c842;
+    text-align: center;
+    line-height: 1.1;
+  }
+  #total small {
+    display: block;
+    font-size: 0.35em;
+    opacity: 0.6;
+    font-weight: normal;
+    margin-top: 4px;
+  }
+
+  #cookie-btn {
+    font-size: clamp(5rem, 20vw, 9rem);
+    background: none;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.08s;
+    user-select: none;
+    line-height: 1;
+    filter: drop-shadow(0 0 20px rgba(245,200,66,0.2));
+  }
+  #cookie-btn:active { transform: scale(0.88); }
+  #cookie-btn:hover { filter: drop-shadow(0 0 30px rgba(245,200,66,0.5)); }
+
+  #stats {
+    display: flex;
+    gap: 32px;
+    font-size: 0.85rem;
+    opacity: 0.75;
+    flex-wrap: wrap;
+    justify-content: center;
+    text-align: center;
+  }
+  #stats div { display: flex; flex-direction: column; gap: 2px; }
+  #stats span { color: #f5c842; font-size: 1.1em; }
+
+  #status {
+    font-size: 0.7rem;
+    opacity: 0.4;
+  }
+
+  .float {
+    position: fixed;
+    pointer-events: none;
+    font-size: 1.2rem;
+    color: #f5c842;
+    font-weight: bold;
+    animation: floatUp 0.9s ease-out forwards;
+    z-index: 99;
+  }
+  @keyframes floatUp {
+    0%   { opacity: 1; transform: translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateY(-80px) scale(0.6); }
+  }
+
+  #progress-bar {
+    width: min(280px, 80vw);
+    height: 6px;
+    background: #2d2010;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  #progress-fill {
+    height: 100%;
+    background: #f5c842;
+    border-radius: 3px;
+    transition: width 0.2s;
+  }
+  #progress-label {
+    font-size: 0.7rem;
+    opacity: 0.5;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<h1>🍪 cookie clicker</h1>
+
+<div id="total">
+  0
+  <small>total cookies (shared)</small>
+</div>
+
+<button id="cookie-btn" title="click!">🍪</button>
+
+<div id="stats">
+  <div>my clicks<span id="my-clicks">0</span></div>
+  <div>multiplier<span id="multiplier">×1</span></div>
+  <div>per click<span id="cpc">1</span></div>
+  <div>online<span id="users">—</span></div>
+</div>
+
+<div id="progress-bar"><div id="progress-fill" style="width:0%"></div></div>
+<div id="progress-label">0 / 25 clicks until ×2</div>
+
+<div id="status">connecting…</div>
+
+<script>
+  const CLICKS_PER_LEVEL = 25;
+
+  let myClicks = 0;
+  let totalCookies = 0;
+
+  const totalEl   = document.getElementById('total');
+  const myClicksEl= document.getElementById('my-clicks');
+  const multEl    = document.getElementById('multiplier');
+  const cpcEl     = document.getElementById('cpc');
+  const usersEl   = document.getElementById('users');
+  const statusEl  = document.getElementById('status');
+  const fillEl    = document.getElementById('progress-fill');
+  const labelEl   = document.getElementById('progress-label');
+  const btn       = document.getElementById('cookie-btn');
+
+  function getMultiplier(clicks) {
+    return 1 + Math.floor(clicks / CLICKS_PER_LEVEL);
+  }
+
+  function fmt(n) {
+    if (n >= 1e12) return (n / 1e12).toFixed(2) + 'T';
+    if (n >= 1e9)  return (n / 1e9).toFixed(2) + 'B';
+    if (n >= 1e6)  return (n / 1e6).toFixed(2) + 'M';
+    if (n >= 1e3)  return (n / 1e3).toFixed(1) + 'K';
+    return n.toLocaleString();
+  }
+
+  function updateUI() {
+    const mult = getMultiplier(myClicks);
+    const nextLevel = mult * CLICKS_PER_LEVEL;
+    const prevLevel = (mult - 1) * CLICKS_PER_LEVEL;
+    const progress = ((myClicks - prevLevel) / CLICKS_PER_LEVEL) * 100;
+
+    totalEl.childNodes[0].textContent = fmt(totalCookies);
+    myClicksEl.textContent = fmt(myClicks);
+    multEl.textContent = '×' + mult;
+    cpcEl.textContent = fmt(mult);
+    fillEl.style.width = progress + '%';
+
+    const remaining = nextLevel - myClicks;
+    labelEl.textContent = `${myClicks - prevLevel} / ${CLICKS_PER_LEVEL} clicks until ×${mult + 1}`;
+  }
+
+  // WebSocket
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  let ws;
+
+  function connect() {
+    ws = new WebSocket(`${proto}://${location.host}`);
+
+    ws.onopen = () => {
+      statusEl.textContent = 'connected';
+    };
+
+    ws.onclose = () => {
+      statusEl.textContent = 'disconnected — reconnecting…';
+      setTimeout(connect, 2000);
+    };
+
+    ws.onerror = () => ws.close();
+
+    ws.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'state' || msg.type === 'update') {
+        totalCookies = msg.total;
+        updateUI();
+      }
+      if (msg.type === 'users') {
+        usersEl.textContent = msg.users;
+      }
+      if (msg.type === 'state') {
+        usersEl.textContent = msg.users;
+      }
+    };
+  }
+
+  connect();
+
+  // Click handler
+  btn.addEventListener('click', (e) => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+    myClicks++;
+    const amount = getMultiplier(myClicks - 1); // multiplier before this click
+
+    ws.send(JSON.stringify({ type: 'click', amount }));
+
+    // floating number
+    const f = document.createElement('div');
+    f.className = 'float';
+    f.textContent = '+' + fmt(amount);
+    f.style.left = (e.clientX - 20) + 'px';
+    f.style.top  = (e.clientY - 20) + 'px';
+    document.body.appendChild(f);
+    f.addEventListener('animationend', () => f.remove());
+
+    updateUI();
+  });
+
+  updateUI();
+</script>
+</body>
+</html>
