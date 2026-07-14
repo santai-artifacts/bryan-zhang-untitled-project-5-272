@@ -173,7 +173,7 @@
   let ws;
 
   function connect() {
-    ws = new WebSocket(`${proto}://${location.host}`);
+    ws = new WebSocket(`${proto}://${location.host}/ws`);
 
     ws.onopen = () => {
       statusEl.textContent = 'connected';
