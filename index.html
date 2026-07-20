@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Code — Capability Workflow Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0e0f14;
+    --surface: #161820;
+    --surface2: #1e2028;
+    --border: #2a2d3a;
+    --border2: #363a4a;
+    --text: #e8eaf0;
+    --text2: #9499b0;
+    --text3: #5c6078;
+    --accent: #7c6af5;
+    --accent2: #9d8ff7;
+    --green: #4ade80;
+    --blue: #60a5fa;
+    --orange: #fb923c;
+    --pink: #f472b6;
+    --yellow: #facc15;
+    --red: #f87171;
+    --cyan: #22d3ee;
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Header */
+  header {
+    padding: 20px 32px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface);
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: -0.3px;
+  }
+  .logo-icon {
+    width: 28px; height: 28px;
+    background: linear-gradient(135deg, var(--accent), var(--pink));
+    border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+  .subtitle {
+    font-size: 13px;
+    color: var(--text2);
+  }
+
+  /* Layout */
+  .app {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    height: calc(100vh - 61px);
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: 280px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    background: var(--surface);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  .sidebar-section {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sidebar-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 10px;
+  }
+
+  .workflow-btn {
+    width: 100%;
+    text-align: left;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text2);
+    cursor: pointer;
+    font-size: 13px;
+    font-family: 'Inter', sans-serif;
+    transition: all 0.15s;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .workflow-btn:hover { background: var(--surface2); color: var(--text); border-color: var(--border); }
+  .workflow-btn.active { background: rgba(124,106,245,0.12); color: var(--accent2); border-color: rgba(124,106,245,0.3); }
+  .workflow-btn .wf-icon { font-size: 16px; flex-shrink: 0; }
+  .workflow-btn .wf-title { font-weight: 500; }
+  .workflow-btn .wf-desc { font-size: 11px; color: var(--text3); display: block; line-height: 1.4; margin-top: 2px; }
+
+  /* Tool legend */
+  .tool-legend { padding: 16px; }
+  .legend-item {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: var(--text2);
+    margin-bottom: 8px;
+  }
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* Main canvas */
+  .canvas {
+    flex: 1;
+    overflow: auto;
+    padding: 32px;
+    background: var(--bg);
+  }
+
+  .workflow-header {
+    margin-bottom: 28px;
+  }
+  .workflow-title {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-bottom: 6px;
+  }
+  .workflow-description {
+    font-size: 14px;
+    color: var(--text2);
+    max-width: 640px;
+    line-height: 1.6;
+  }
+
+  /* Flow diagram */
+  .flow {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    max-width: 860px;
+  }
+
+  .flow-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+  }
+
+  .flow-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* Step node */
+  .step {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    width: 220px;
+    flex-shrink: 0;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    cursor: default;
+  }
+  .step:hover {
+    border-color: var(--border2);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+  }
+  .step.highlighted {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(124,106,245,0.2);
+  }
+
+  .step-tool-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .step-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+    line-height: 1.4;
+  }
+  .step-detail {
+    font-size: 11px;
+    color: var(--text2);
+    line-height: 1.5;
+    font-family: 'JetBrains Mono', monospace;
+    word-break: break-all;
+  }
+
+  /* Tool category colors */
+  .cat-file    { background: rgba(96,165,250,0.12); color: var(--blue); }
+  .cat-shell   { background: rgba(74,222,128,0.12); color: var(--green); }
+  .cat-search  { background: rgba(250,204,21,0.12); color: var(--yellow); }
+  .cat-agent   { background: rgba(124,106,245,0.12); color: var(--accent2); }
+  .cat-task    { background: rgba(251,146,60,0.12); color: var(--orange); }
+  .cat-web     { background: rgba(34,211,238,0.12); color: var(--cyan); }
+  .cat-deploy  { background: rgba(244,114,182,0.12); color: var(--pink); }
+  .cat-notify  { background: rgba(248,113,113,0.12); color: var(--red); }
+  .cat-plan    { background: rgba(250,204,21,0.12); color: var(--yellow); }
+
+  .dot-file   { background: var(--blue); }
+  .dot-shell  { background: var(--green); }
+  .dot-search { background: var(--yellow); }
+  .dot-agent  { background: var(--accent2); }
+  .dot-task   { background: var(--orange); }
+  .dot-web    { background: var(--cyan); }
+  .dot-deploy { background: var(--pink); }
+  .dot-notify { background: var(--red); }
+  .dot-plan   { background: var(--yellow); }
+
+  /* Connectors */
+  .arrow-down {
+    width: 2px;
+    height: 28px;
+    background: linear-gradient(to bottom, var(--border2), var(--border));
+    position: relative;
+    flex-shrink: 0;
+    align-self: center;
+  }
+  .arrow-down::after {
+    content: '';
+    position: absolute;
+    bottom: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid var(--border);
+  }
+
+  .arrow-right {
+    width: 32px;
+    height: 2px;
+    background: linear-gradient(to right, var(--border2), var(--border));
+    position: relative;
+    flex-shrink: 0;
+    align-self: center;
+    margin-top: 30px;
+  }
+  .arrow-right::after {
+    content: '';
+    position: absolute;
+    right: -5px;
+    top: 50%;
+    transform: translateY(-50%);
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+    border-left: 6px solid var(--border);
+  }
+
+  /* Parallel block */
+  .parallel-container {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+    position: relative;
+  }
+
+  .parallel-bracket {
+    width: 20px;
+    flex-shrink: 0;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  .parallel-bracket::before {
+    content: '';
+    position: absolute;
+    top: 30px;
+    bottom: 30px;
+    width: 2px;
+    background: var(--border2);
+    border-radius: 1px;
+  }
+  .parallel-bracket.left::after {
+    content: '';
+    position: absolute;
+    top: 30px;
+    bottom: 30px;
+    right: 0;
+    width: 10px;
+    border-left: 2px solid var(--border2);
+    border-top: 2px solid var(--border2);
+    border-bottom: 2px solid var(--border2);
+    border-radius: 3px 0 0 3px;
+  }
+  .parallel-bracket.right::after {
+    content: '';
+    position: absolute;
+    top: 30px;
+    bottom: 30px;
+    left: 0;
+    width: 10px;
+    border-right: 2px solid var(--border2);
+    border-top: 2px solid var(--border2);
+    border-bottom: 2px solid var(--border2);
+    border-radius: 0 3px 3px 0;
+  }
+
+  .parallel-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text3);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    transform: rotate(180deg);
+    padding: 8px 0;
+  }
+
+  .parallel-steps {
+    display: flex;
+    flex-direction: row;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .parallel-step-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* Section label */
+  .flow-section-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text3);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 12px 0 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    align-self: flex-start;
+  }
+  .flow-section-label::after {
+    content: '';
+    height: 1px;
+    width: 60px;
+    background: var(--border);
+  }
+
+  /* Decision diamond */
+  .decision {
+    width: 140px;
+    height: 70px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .decision-diamond {
+    width: 100px;
+    height: 50px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    transform: rotate(45deg) scale(0.7);
+    position: absolute;
+    border-radius: 4px;
+  }
+  .decision-label {
+    position: relative;
+    z-index: 1;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--yellow);
+    text-align: center;
+    line-height: 1.3;
+    padding: 0 8px;
+  }
+
+  /* Output box */
+  .output-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    max-width: 640px;
+    margin-top: 8px;
+  }
+  .output-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text3);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .output-content {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.7;
+  }
+  .output-content .hl { color: var(--accent2); }
+  .output-content .ok { color: var(--green); }
+  .output-content .warn { color: var(--yellow); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+  /* Responsive */
+  @media (max-width: 700px) {
+    .sidebar { width: 220px; }
+    .canvas { padding: 20px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">⚡</div>
+    Claude Code — Workflow Visualizer
+  </div>
+  <div class="subtitle">Tool capability reference · 5 example workflows</div>
+</header>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Workflows</div>
+
+      <button class="workflow-btn active" onclick="show(0)" id="btn0">
+        <span class="wf-icon">🔍</span>
+        <span>
+          <span class="wf-title">Debug a Bug</span>
+          <span class="wf-desc">Explore → edit → test → notify</span>
+        </span>
+      </button>
+
+      <button class="workflow-btn" onclick="show(1)" id="btn1">
+        <span class="wf-icon">🚀</span>
+        <span>
+          <span class="wf-title">Build &amp; Deploy</span>
+          <span class="wf-desc">Scaffold, commit, push to prod</span>
+        </span>
+      </button>
+
+      <button class="workflow-btn" onclick="show(2)" id="btn2">
+        <span class="wf-icon">🌐</span>
+        <span>
+          <span class="wf-title">Research &amp; Write</span>
+          <span class="wf-desc">Web search → synthesize → save</span>
+        </span>
+      </button>
+
+      <button class="workflow-btn" onclick="show(3)" id="btn3">
+        <span class="wf-icon">🤖</span>
+        <span>
+          <span class="wf-title">Multi-Agent Audit</span>
+          <span class="wf-desc">Parallel subagents → workflow</span>
+        </span>
+      </button>
+
+      <button class="workflow-btn" onclick="show(4)" id="btn4">
+        <span class="wf-icon">📅</span>
+        <span>
+          <span class="wf-title">Scheduled Monitor</span>
+          <span class="wf-desc">Cron job → watch → alert</span>
+        </span>
+      </button>
+    </div>
+
+    <div class="tool-legend">
+      <div class="sidebar-label">Tool Categories</div>
+      <div class="legend-item"><div class="legend-dot dot-file"></div>File I/O (Read, Write, Edit)</div>
+      <div class="legend-item"><div class="legend-dot dot-shell"></div>Shell (Bash)</div>
+      <div class="legend-item"><div class="legend-dot dot-search"></div>Search (Grep, Glob)</div>
+      <div class="legend-item"><div class="legend-dot dot-agent"></div>Agent / Workflow</div>
+      <div class="legend-item"><div class="legend-dot dot-task"></div>Task tracking</div>
+      <div class="legend-item"><div class="legend-dot dot-web"></div>Web (Search, Fetch)</div>
+      <div class="legend-item"><div class="legend-dot dot-deploy"></div>Deploy (git_push)</div>
+      <div class="legend-item"><div class="legend-dot dot-notify"></div>Notify / Cron</div>
+      <div class="legend-item"><div class="legend-dot dot-plan"></div>Plan mode</div>
+    </div>
+  </aside>
+
+  <main class="canvas" id="canvas"></main>
+</div>
+
+<script>
+const workflows = [
+  // 0 — Debug a Bug
+  {
+    title: "Debug a Bug",
+    description: "End-to-end flow for tracking down a failing test, editing the root cause, re-running tests, and notifying the user when fixed.",
+    steps: [
+      { type: "single", tool: "TaskCreate", cat: "task", title: "Create tracking task", detail: "subject: \"Fix failing auth test\"" },
+      { type: "arrow" },
+      { type: "parallel-label", label: "Explore (parallel)" },
+      { type: "parallel", steps: [
+        { tool: "Grep", cat: "search", title: "Find failing symbol", detail: "pattern: \"AuthError\"\ntype: \"ts\"" },
+        { tool: "Glob", cat: "search", title: "Locate test files", detail: "pattern: \"**/*.test.ts\"" },
+        { tool: "Read", cat: "file", title: "Read entry point", detail: "file_path: \"/workspace/src/auth.ts\"" },
+      ]},
+      { type: "arrow" },
+      { type: "single", tool: "Edit", cat: "file", title: "Apply fix", detail: "old_string: \"throw new AuthError\"\nnew_string: \"return null\"" },
+      { type: "arrow" },
+      { type: "single", tool: "Bash", cat: "shell", title: "Run tests", detail: "command: \"bun test src/auth.test.ts\"" },
+      { type: "arrow" },
+      { type: "single", tool: "TaskUpdate", cat: "task", title: "Mark task complete", detail: "status: \"completed\"" },
+      { type: "arrow" },
+      { type: "single", tool: "PushNotification", cat: "notify", title: "Notify user", detail: "message: \"Auth tests passing — fix shipped\"" },
+      { type: "output", lines: [
+        '<span class="ok">✓</span> 14 tests passed  <span class="hl">0 failed</span>',
+        '<span class="ok">✓</span> Task #3 → completed',
+        '<span class="ok">✓</span> Push notification sent',
+      ]},
+    ]
+  },
+
+  // 1 — Build & Deploy
+  {
+    title: "Build & Deploy",
+    description: "Scaffold a new full-stack Bun app, commit it to git, and push to production via the deployment tool.",
+    steps: [
+      { type: "single", tool: "EnterPlanMode", cat: "plan", title: "Enter plan mode", detail: "Align on stack & file structure" },
+      { type: "arrow" },
+      { type: "parallel-label", label: "Scaffold (parallel)" },
+      { type: "parallel", steps: [
+        { tool: "Write", cat: "file", title: "Write index.ts", detail: "Server entry · PORT env · Hono routes" },
+        { tool: "Write", cat: "file", title: "Write package.json", detail: "\"start\": \"bun run index.ts\"" },
+        { tool: "Write", cat: "file", title: "Write index.html", detail: "Client UI in public/" },
+      ]},
+      { type: "arrow" },
+      { type: "single", tool: "Bash", cat: "shell", title: "Init git + commit", detail: "git init && git add . && git commit" },
+      { type: "arrow" },
+      { type: "single", tool: "mcp__git__git_push", cat: "deploy", title: "Deploy to production", detail: "repo_name: \"my-app\"\n→ returns live URL" },
+      { type: "output", lines: [
+        '<span class="ok">✓</span> Deployment queued',
+        '<span class="hl">https://my-app.santai.dev</span>',
+        '<span class="warn">~</span> GitHub Pages build: ~45s',
+      ]},
+    ]
+  },
+
+  // 2 — Research & Write
+  {
+    title: "Research & Write",
+    description: "Search the web for up-to-date information, fetch a reference page, synthesize findings, and persist them to a knowledge file.",
+    steps: [
+      { type: "single", tool: "TaskCreate", cat: "task", title: "Create research task", detail: "subject: \"Document Bun SQLite API\"" },
+      { type: "arrow" },
+      { type: "parallel-label", label: "Gather (parallel)" },
+      { type: "parallel", steps: [
+        { tool: "WebSearch", cat: "web", title: "Search web", detail: "query: \"Bun SQLite bun:sqlite 2026\"" },
+        { tool: "WebFetch", cat: "web", title: "Fetch docs page", detail: "url: \"https://bun.sh/docs/api/sqlite\"\nprompt: \"summarize API\"" },
+      ]},
+      { type: "arrow" },
+      { type: "single", tool: "Write", cat: "file", title: "Write reference doc", detail: "file_path: \"/workspace/docs/sqlite.md\"\ncontent: synthesized notes" },
+      { type: "arrow" },
+      { type: "single", tool: "TaskUpdate", cat: "task", title: "Complete task", detail: "status: \"completed\"" },
+      { type: "output", lines: [
+        '<span class="ok">✓</span> /workspace/docs/sqlite.md written',
+        '<span class="hl">Sources:</span> bun.sh/docs · 2 web results',
+      ]},
+    ]
+  },
+
+  // 3 — Multi-Agent Audit
+  {
+    title: "Multi-Agent Codebase Audit",
+    description: "Fan out specialized subagents in parallel to audit different dimensions of the codebase, then synthesize with a Workflow.",
+    steps: [
+      { type: "single", tool: "Glob", cat: "search", title: "Discover all source files", detail: "pattern: \"src/**/*.ts\"" },
+      { type: "arrow" },
+      { type: "single", tool: "Workflow", cat: "agent", title: "Launch audit workflow", detail: "script: parallel audit pipeline\n3 agent dimensions" },
+      { type: "arrow" },
+      { type: "parallel-label", label: "Parallel subagents" },
+      { type: "parallel", steps: [
+        { tool: "Agent (Explore)", cat: "agent", title: "Security audit", detail: "Find XSS / injection\nvulnerabilities" },
+        { tool: "Agent (general)", cat: "agent", title: "Performance audit", detail: "Identify N+1 queries\n& slow paths" },
+        { tool: "Agent (Explore)", cat: "agent", title: "Dependency audit", detail: "Check outdated\npackages" },
+      ]},
+      { type: "arrow" },
+      { type: "single", tool: "Write", cat: "file", title: "Write audit report", detail: "file_path: \"audit-report.md\"\nfindings from all agents" },
+      { type: "arrow" },
+      { type: "single", tool: "PushNotification", cat: "notify", title: "Alert on critical findings", detail: "message: \"Audit done: 2 critical issues\"" },
+      { type: "output", lines: [
+        '<span class="ok">✓</span> 3 subagents completed',
+        '<span class="warn">⚠</span> 2 critical · 5 warnings · 12 info',
+        '<span class="ok">✓</span> audit-report.md written',
+      ]},
+    ]
+  },
+
+  // 4 — Scheduled Monitor
+  {
+    title: "Scheduled Monitor",
+    description: "Set up a recurring cron job to watch a background process, stream events with Monitor, and push a notification when the condition is met.",
+    steps: [
+      { type: "single", tool: "Bash", cat: "shell", title: "Start background process", detail: "command: \"bun run build.ts\"\nrun_in_background: true" },
+      { type: "arrow" },
+      { type: "single", tool: "Monitor", cat: "notify", title: "Stream build events", detail: "command: \"tail -f build.log | grep -E \\\"error|done\\\"\"\ndescription: \"build watcher\"" },
+      { type: "arrow" },
+      { type: "single", tool: "CronCreate", cat: "notify", title: "Schedule health check", detail: "cron: \"*/15 * * * *\"\nrecurring: true\nprompt: \"check server health\"" },
+      { type: "arrow" },
+      { type: "single", tool: "Bash", cat: "shell", title: "Health check command", detail: "command: \"curl -sf http://localhost:3000/health || echo FAIL\"" },
+      { type: "arrow" },
+      { type: "single", tool: "PushNotification", cat: "notify", title: "Push alert on failure", detail: "message: \"Server health check failed — investigate\"" },
+      { type: "arrow" },
+      { type: "single", tool: "CronDelete", cat: "notify", title: "Cancel cron job", detail: "id: \"<job-id from CronCreate>\"" },
+      { type: "output", lines: [
+        '<span class="ok">✓</span> Monitor armed · streaming build.log',
+        '<span class="hl">Cron</span> every 15 min · auto-expires in 7d',
+        '<span class="ok">✓</span> Build complete in 4.2s',
+      ]},
+    ]
+  },
+];
+
+const catLabel = {
+  file: "File I/O", shell: "Shell", search: "Search",
+  agent: "Agent", task: "Task", web: "Web",
+  deploy: "Deploy", notify: "Notify/Cron", plan: "Plan",
+};
+
+function badge(tool, cat) {
+  return `<span class="step-tool-badge cat-${cat}">${tool}</span>`;
+}
+
+function renderStep(s) {
+  return `
+    <div class="step">
+      ${badge(s.tool, s.cat)}
+      <div class="step-title">${s.title}</div>
+      <div class="step-detail">${s.detail.replace(/\n/g, '<br>')}</div>
+    </div>`;
+}
+
+function renderFlow(steps) {
+  let html = '<div class="flow">';
+  for (const s of steps) {
+    if (s.type === 'single') {
+      html += `<div class="flow-col">${renderStep(s)}</div>`;
+    } else if (s.type === 'arrow') {
+      html += `<div class="flow-col"><div class="arrow-down"></div></div>`;
+    } else if (s.type === 'parallel-label') {
+      html += `<div class="flow-section-label">${s.label}</div>`;
+    } else if (s.type === 'parallel') {
+      html += `<div class="parallel-container">`;
+      html += `<div class="parallel-bracket left"></div>`;
+      html += `<div class="parallel-steps">`;
+      for (let i = 0; i < s.steps.length; i++) {
+        html += `<div class="parallel-step-col">${renderStep(s.steps[i])}</div>`;
+        if (i < s.steps.length - 1) {
+          html += `<div class="arrow-right"></div>`;
+        }
+      }
+      html += `</div>`;
+      html += `<div class="parallel-bracket right"></div>`;
+      html += `</div>`;
+    } else if (s.type === 'output') {
+      html += `
+        <div class="flow-col">
+          <div class="arrow-down"></div>
+          <div class="output-box">
+            <div class="output-label">Result</div>
+            <div class="output-content">${s.lines.join('<br>')}</div>
+          </div>
+        </div>`;
+    }
+  }
+  html += '</div>';
+  return html;
+}
+
+function show(idx) {
+  const w = workflows[idx];
+  document.getElementById('canvas').innerHTML = `
+    <div class="workflow-header">
+      <div class="workflow-title">${w.title}</div>
+      <div class="workflow-description">${w.description}</div>
+    </div>
+    ${renderFlow(w.steps)}
+  `;
+  document.querySelectorAll('.workflow-btn').forEach((b, i) => {
+    b.classList.toggle('active', i === idx);
+  });
+}
+
+show(0);
+</script>
+</body>
+</html>
