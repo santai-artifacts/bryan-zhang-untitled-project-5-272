@@ -1,0 +1,9 @@
+{
+  "name": "jpeg-to-png",
+  "scripts": {
+    "start": "bun run index.ts"
+  },
+  "dependencies": {
+    "sharp": "^0.33.4"
+  }
+}
